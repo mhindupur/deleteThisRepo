@@ -39,11 +39,16 @@ Principal + Operation + Entity + Scope + Conditions
     → Authorization → Context Assembly → Context Package → Plan → Skill Harness → Audit
 ```
 
+## Collaboration
+
+See [`AGENTS.md`](./AGENTS.md) for branch/PR conventions, component ownership, and Cursor collaboration guidance.
+
 ## Getting started
 
 1. Read the architecture documents in `Documents/`.
-2. Browse component README stubs for the area you are implementing.
-3. Implement services under the matching folder following the planned `src/` and `tests/` layout in each README.
+2. Read [`AGENTS.md`](./AGENTS.md) and fill in ownership for your team.
+3. Browse component README stubs for the area you are implementing.
+4. Implement services under the matching folder following the planned `src/` and `tests/` layout in each README.
 
 ## Status
 
