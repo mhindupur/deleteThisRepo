@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AccuSec Calculator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Sora:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true"></div>
+
+    <main class="shell">
+      <header class="brand">
+        <p class="brand-mark">AccuSec</p>
+        <h1>Calculator</h1>
+        <p class="lede">A precise, keyboard-friendly sample for the AccuSec project base.</p>
+      </header>
+
+      <section class="calculator" aria-label="AccuSec calculator">
+        <div class="display" aria-live="polite">
+          <span class="expression" id="expression"></span>
+          <output class="value" id="display" for="keypad">0</output>
+        </div>
+
+        <div class="keypad" id="keypad" role="group" aria-label="Calculator keys">
+          <button type="button" data-action="clear" class="key key-accent">AC</button>
+          <button type="button" data-action="sign" class="key key-muted">±</button>
+          <button type="button" data-action="percent" class="key key-muted">%</button>
+          <button type="button" data-op="÷" class="key key-op">÷</button>
+
+          <button type="button" data-digit="7" class="key">7</button>
+          <button type="button" data-digit="8" class="key">8</button>
+          <button type="button" data-digit="9" class="key">9</button>
+          <button type="button" data-op="×" class="key key-op">×</button>
+
+          <button type="button" data-digit="4" class="key">4</button>
+          <button type="button" data-digit="5" class="key">5</button>
+          <button type="button" data-digit="6" class="key">6</button>
+          <button type="button" data-op="−" class="key key-op">−</button>
+
+          <button type="button" data-digit="1" class="key">1</button>
+          <button type="button" data-digit="2" class="key">2</button>
+          <button type="button" data-digit="3" class="key">3</button>
+          <button type="button" data-op="+" class="key key-op">+</button>
+
+          <button type="button" data-digit="0" class="key key-zero">0</button>
+          <button type="button" data-action="decimal" class="key">.</button>
+          <button type="button" data-action="equals" class="key key-equals">=</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="js/calculator.js"></script>
+  </body>
+</html>
