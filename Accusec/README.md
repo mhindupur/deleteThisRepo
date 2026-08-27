@@ -1,13 +1,50 @@
 # AccuSec
 
-Base project folder for AccuSec inside the DatacenterAgent repository.
+AccuSec is an Enterprise AI Operating System for datacenter management. This folder is the base project inside the DatacenterAgent repository.
 
-AccuSec is a datacenter management application with multiple components.
+## Architecture documents
 
-## Documents
-
-Architecture and vision documents are in [`Documents/`](./Documents/):
+Canonical architecture and vision documents are in [`Documents/`](./Documents/):
 
 - `AccuSec_Canon_3_Part_I_Architecture_Vision.docx`
 - `Accusec-detailed architecture- part1.docx`
 - `Canon 3 — Logical-AccuSec Architecture.docx`
+
+## Project structure
+
+Each logical component from the AccuSec architecture has a dedicated folder with a README stub.
+
+```
+Accusec/
+├── Documents/                  # Architecture canon
+├── shared/                     # Domain models and API contracts
+├── interfaces/                 # User interfaces (desktop, web, chat, API, SDK)
+├── orchestration/              # AI orchestration (planner, workflow, scheduler)
+├── agents/                     # Agent framework, skills, harness, MCP client
+├── platform-services/          # Context, auth, policy, audit, notifications, etc.
+├── memory/                     # Organizational memory stores
+├── data/                       # Data layer adapters (PostgreSQL, vector, graph, etc.)
+├── integration/                # Connectors, collectors, gateway, event bus
+├── ai/                         # AI gateway and model providers
+├── security/                   # RBAC, tenancy, privacy, compliance
+└── foundation/                 # Kubernetes, CI/CD, IaC, monitoring, logging
+```
+
+## Core semantic model
+
+AccuSec unifies memory, context, and authorization around:
+
+```
+Principal + Operation + Entity + Scope + Conditions
+    → Authorization → Context Assembly → Context Package → Plan → Skill Harness → Audit
+```
+
+## Getting started
+
+1. Read the architecture documents in `Documents/`.
+2. Browse component README stubs for the area you are implementing.
+3. Implement services under the matching folder following the planned `src/` and `tests/` layout in each README.
+
+## Status
+
+Repository scaffold — folder structure and README stubs only. Implementation pending.
