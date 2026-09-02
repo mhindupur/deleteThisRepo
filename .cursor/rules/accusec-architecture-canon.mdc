@@ -1,0 +1,32 @@
+---
+description: AccuSec architecture canon — treat Documents/ as the development baseline
+alwaysApply: true
+---
+
+# AccuSec Architecture Canon
+
+AccuSec is an **Enterprise AI Operating System** for Hybrid Cloud Infrastructure Management. This repo is the DatacenterAgent host; implementation lives under `Accusec/`.
+
+Canonical sources (read before designing or coding):
+
+- `Accusec/Documents/AccuSec_Canon_3_Part_I_Architecture_Vision.md`
+- `Accusec/Documents/Canon_3_Logical_AccuSec_Architecture.md`
+- `Accusec/Documents/Accusec-detailed-architecture-part1.md`
+- `Accusec/Documents/Architecture_Diagram.png`
+- `Accusec/AGENTS.md`
+
+## Thesis
+
+Reasoning may be probabilistic. Enterprise execution must be governed and evidence-producing. The model may propose, interpret, decompose, rank, and explain. It is never the authority for identity, policy, permission, transaction commitment, or audit truth.
+
+## First domain
+
+Hybrid Cloud: private cloud, virtualization, Kubernetes, public cloud, edge, and related IT ops systems. Prove five administrator workflows with the design partner before expanding domains.
+
+## Development rules
+
+- Implement inside the matching scaffold folder. Do not invent a parallel layout.
+- Prefer deterministic code, rules, queries, and workflows when they solve the problem reliably. Do not require an LLM for every operation.
+- A component exists only if it satisfies a cross-cutting architectural requirement or a validated Hybrid Cloud use case.
+- Material contradictions of Canon 3 require an Architecture Decision Record.
+- Do not rewrite architecture docs unless asked.

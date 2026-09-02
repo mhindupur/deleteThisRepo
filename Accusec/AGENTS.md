@@ -120,9 +120,13 @@ Fill in names so collaborators and agents know who owns what. Update this table 
 
 ## Architecture references
 
-- `Documents/AccuSec_Canon_3_Part_I_Architecture_Vision.docx`
-- `Documents/Accusec-detailed architecture- part1.docx`
-- `Documents/Canon 3 — Logical-AccuSec Architecture.docx`
+These documents are the development baseline. Do not contradict them without an ADR.
+
+- `Documents/README.md` — canon index
+- `Documents/AccuSec_Canon_3_Part_I_Architecture_Vision.md`
+- `Documents/Canon_3_Logical_AccuSec_Architecture.md`
+- `Documents/Accusec-detailed-architecture-part1.md`
+- `Documents/Architecture_Diagram.png`
 - Root overview: [`README.md`](./README.md)
 
 ## Status

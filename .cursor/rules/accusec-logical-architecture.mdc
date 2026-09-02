@@ -1,0 +1,42 @@
+---
+description: AccuSec logical layers, execution path, and component ownership
+alwaysApply: true
+---
+
+# Logical Architecture Contract
+
+Folder layout under `Accusec/` maps 1:1 to Canon 3 Part II. Preserve logical boundaries even when Basic Edition collapses processes.
+
+## Execution path (change operations)
+
+Interfaces → API Gateway → Agent Orchestrator → Planner → Policy → Human-in-the-Loop (if required) → Workflow Engine → Skill Harness → MCP Client / Connectors → target system → postcondition validation → Audit.
+
+Models are reached only through the AI Gateway. Connectors retrieve secrets only from Security and Secrets Manager.
+
+## Phases that must not be collapsed
+
+Observe → Reason → Authorize → Approve → Execute → Validate → Record.
+
+## Layer ownership
+
+| Layer | Path | Role |
+|---|---|---|
+| Interfaces | `interfaces/` | Clients only; never bypass identity, policy, or audit |
+| Orchestration | `orchestration/` | Durable task lifecycle, not unbounded prompt loops |
+| Agent framework | `agents/` | Versioned Enterprise AI Engineers, skills, harness, MCP client, memory manager |
+| Platform services | `platform-services/` | Context, policy, secrets, audit, notifications, metering |
+| Memory | `memory/` | Entity, topology, history, policy/ownership, learned, operation catalog, scope |
+| Data | `data/` | Logical stores; first release may consolidate products, not contracts |
+| Integration | `integration/` | Connectors, collectors, MCP registry, gateway, events, queues, webhooks |
+| AI | `ai/` | Gateway, model orchestrator, providers; model output is untrusted proposal |
+| Security | `security/` | RBAC/ABAC, tenancy, privacy, compliance — non-generative control planes |
+| Foundation | `foundation/` | K8s, mesh, CI/CD, IaC, monitoring, logging, backup — operates AccuSec, does not replace it |
+| Shared | `shared/` | Contracts first; coordinate before schema changes |
+
+## Autonomy
+
+Autonomy is per workflow/action/target/tenant/identity, levels A0–A5. Increase autonomy only with evidence of accuracy, security, recoverability, and operator trust.
+
+## Quality order (Hybrid Cloud)
+
+Security/isolation > correctness/safety > auditability > recoverability > availability > interoperability > performance > cost > implementation simplicity.

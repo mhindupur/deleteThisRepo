@@ -4,11 +4,12 @@ AccuSec is an Enterprise AI Operating System for datacenter management. This fol
 
 ## Architecture documents
 
-Canonical architecture and vision documents are in [`Documents/`](./Documents/):
+Canonical architecture and vision documents are in [`Documents/`](./Documents/). Prefer the markdown extracts for search and agent context; Word files are the originals.
 
-- `AccuSec_Canon_3_Part_I_Architecture_Vision.docx`
-- `Accusec-detailed architecture- part1.docx`
-- `Canon 3 — Logical-AccuSec Architecture.docx`
+- `AccuSec_Canon_3_Part_I_Architecture_Vision.md` — Part I architecture vision
+- `Canon_3_Logical_AccuSec_Architecture.md` — Part II logical architecture
+- `Accusec-detailed-architecture-part1.md` — semantic model (Principal + Operation + Entity + Scope)
+- `Architecture_Diagram.png` — canonical architecture diagram
 
 ## Project structure
 

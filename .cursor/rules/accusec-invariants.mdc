@@ -1,0 +1,33 @@
+---
+description: AccuSec MUST/MUST NOT security and execution invariants
+alwaysApply: true
+---
+
+# AccuSec Invariants
+
+These are architectural requirements. Later designs may refine them but must not contradict them.
+
+## MUST
+
+- Every external state change maps to an admitted task, authorized step, tool invocation, and audit event.
+- Every operation executes under a verified human or workload principal with bounded scope and lifetime.
+- Policy is evaluated at request admission, plan approval, tool invocation, credential use, and high-impact state transitions.
+- Durable workflow state lives outside chat history and model context.
+- Tool access goes through registered, typed, policy-aware contracts (MCP or API). Dynamic discovery is not trust.
+- High-impact plans require the required approval state; approval is bound to a plan version.
+- Change workflows define postconditions and revalidate target-system state after material changes.
+- Retries of state-changing steps use idempotency keys or reconciliation.
+- Context packages carry provenance, freshness, tenant, classification, and authorization decision IDs.
+- Secrets are retrieved via Security and Secrets Manager as short-lived scoped credentials.
+
+## MUST NOT
+
+- No privileged operation based only on model output.
+- No LLM access to raw credentials or unmanaged enterprise APIs.
+- No prompts as the sole mechanism for access control, tenancy, compliance, or workflow safety.
+- No vector retrieval as authorization or source of truth.
+- No cross-tenant data, memory, events, or model context without explicit authorized sharing.
+- No secret values in prompts, logs, embeddings, conversational memory, or audit payloads.
+- No reporting success from an API response alone; verify the operational outcome.
+- No plugin, agent, connector, or MCP server bypass of identity, policy, harness, or audit.
+- No hiding target-system errors behind confident natural language.

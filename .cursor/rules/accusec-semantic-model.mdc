@@ -1,0 +1,27 @@
+---
+description: AccuSec unifying semantic model for memory, context, RBAC, skills, and audit
+alwaysApply: true
+---
+
+# Unifying Semantic Model
+
+Keep memory, context, authorization, planning, skills, and audit aligned on:
+
+```
+Principal + Operation + Entity + Scope + Conditions
+```
+
+Canonical operational request:
+
+```
+{ Tenant, Workspace, Principal, Intent, Operation, Target Entity Set, Scope, Conditions, Requested Outcome }
+```
+
+- **Intent** is what the user said. **Operation** is the normalized catalog action (e.g. `storage.volume.expand`).
+- **Entity** is a stable AccuSec entity (`entity_id` separate from `provider_entity_id` and display name).
+- **Scope** is a first-class authorization and retrieval boundary (containment, ownership, application, environment, tags, dynamic selectors). A scope may be backed by an entity but is not identical to it.
+- Memory uses a subject-association model (one record may link many entities, types, scopes, operations, policies, principals, workflows). Do not force a single `entity_id` or mandatory `operation` on every memory record.
+- Context access authorization and execution authorization are separate checks. Filter at query time before assembling context or sending anything to a model.
+- Return a structured **Context Package** (`context_id`) and reference it from plan, approval, skill execution, audit, and postcondition validation.
+
+Authorization tuple: `<Tenant, Workspace, Principal, Operation, Entity Type, Entity Instance, Scope, Conditions>`.
