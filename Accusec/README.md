@@ -9,7 +9,8 @@ Canonical architecture and vision documents are in [`Documents/`](./Documents/).
 - `AccuSec_Canon_3_Part_I_Architecture_Vision.md` — Part I architecture vision
 - `Canon_3_Logical_AccuSec_Architecture.md` — Part II logical architecture
 - `Accusec-detailed-architecture-part1.md` — semantic model (Principal + Operation + Entity + Scope)
-- `Architecture_Diagram.png` — canonical architecture diagram
+- `AccuSec_Enterprise_AI_Operating_System_Architecture.png` — canonical architecture diagram
+- `Architecture_Diagram.png` — prior architecture diagram extract
 
 ## Project structure
 

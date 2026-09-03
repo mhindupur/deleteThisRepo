@@ -7,7 +7,8 @@ These documents are the **base for AccuSec development**. Designs, APIs, agents,
 | [AccuSec_Canon_3_Part_I_Architecture_Vision.md](./AccuSec_Canon_3_Part_I_Architecture_Vision.md) | Part I — architecture vision, principles, invariants, actors, autonomy model, non-goals |
 | [Canon_3_Logical_AccuSec_Architecture.md](./Canon_3_Logical_AccuSec_Architecture.md) | Part II — high-level logical architecture; component contracts and trust boundaries |
 | [Accusec-detailed-architecture-part1.md](./Accusec-detailed-architecture-part1.md) | Semantic model: Principal + Operation + Entity + Scope + Conditions |
-| [Architecture_Diagram.png](./Architecture_Diagram.png) | Canonical high-level architecture diagram |
+| [AccuSec_Enterprise_AI_Operating_System_Architecture.png](./AccuSec_Enterprise_AI_Operating_System_Architecture.png) | Canonical high-level architecture diagram (Enterprise AI Operating System) |
+| [Architecture_Diagram.png](./Architecture_Diagram.png) | Prior architecture diagram extract |
 
 Word originals (same content) are kept beside the markdown extracts for source-of-truth comparison.
 

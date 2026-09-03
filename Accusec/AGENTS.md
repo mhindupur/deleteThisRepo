@@ -126,6 +126,7 @@ These documents are the development baseline. Do not contradict them without an 
 - `Documents/AccuSec_Canon_3_Part_I_Architecture_Vision.md`
 - `Documents/Canon_3_Logical_AccuSec_Architecture.md`
 - `Documents/Accusec-detailed-architecture-part1.md`
+- `Documents/AccuSec_Enterprise_AI_Operating_System_Architecture.png`
 - `Documents/Architecture_Diagram.png`
 - Root overview: [`README.md`](./README.md)
 
