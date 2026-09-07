@@ -2,20 +2,23 @@
 
 **Layer:** Integration
 
-Connectors for vSphere, Nutanix, AWS, Azure, GCP, and Kubernetes.
+Connectors for each infrastructure platform. Vendor SDKs live here only.
 
 ## Status
 
-Scaffold only — implementation pending.
+Scaffold — `aws/` connector folder exists; implementation pending.
 
-## Architecture references
+## Provider connectors
 
-- `Documents/AccuSec_Canon_3_Part_I_Architecture_Vision.docx`
-- `Documents/Accusec-detailed architecture- part1.docx`
-- `Documents/Canon 3 — Logical-AccuSec Architecture.docx`
+| Provider | Path |
+|---|---|
+| AWS | [`aws/`](./aws/) |
+
+Add sibling folders for Azure, GCP, VMware, Nutanix, Kubernetes, and others.
+Do not call vendor APIs from agents or skills.
 
 ## Planned contents
 
-- `src/` — Service or module source code
-- `tests/` — Unit and integration tests
-- `README.md` — Component documentation (this file)
+- `src/` — shared connector interface (auth, normalize, retry)
+- `tests/` — interface tests
+- `<provider>/` — vendor implementation

@@ -4,18 +4,24 @@
 
 Versioned, reusable skill definitions for governed tool execution.
 
+Skills are grouped by **provider** so AWS, Azure, GCP, VMware, Nutanix, and
+on-prem packs can land without sharing modules.
+
 ## Status
 
-Scaffold only — implementation pending.
+Scaffold — `aws/` pack folder exists; implementation pending.
 
-## Architecture references
+## Provider skills
 
-- `Documents/AccuSec_Canon_3_Part_I_Architecture_Vision.docx`
-- `Documents/Accusec-detailed architecture- part1.docx`
-- `Documents/Canon 3 — Logical-AccuSec Architecture.docx`
+| Provider | Path |
+|---|---|
+| AWS | [`aws/`](./aws/) |
+
+Add `azure/`, `gcp/`, `vmware/`, `nutanix/` as sibling folders using the AWS
+README as the template.
 
 ## Planned contents
 
-- `src/` — Service or module source code
-- `tests/` — Unit and integration tests
-- `README.md` — Component documentation (this file)
+- `src/` — shared skill schema / loader
+- `tests/` — schema tests
+- `<provider>/` — provider skill manifests

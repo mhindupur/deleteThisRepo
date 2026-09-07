@@ -2,20 +2,27 @@
 
 **Layer:** Integration
 
-MCP server implementations exposing AccuSec capabilities.
+MCP server implementations. One server process (or package) **per provider**
+so AWS, Azure, GCP, VMware, and Nutanix tools stay isolated.
+
+The MCP client and registry remain shared. A newly advertised tool is not
+executable until it is registered, allowlisted, and policy-approved.
 
 ## Status
 
-Scaffold only — implementation pending.
+Scaffold — `aws/` server folder exists; implementation pending.
 
-## Architecture references
+## Provider servers
 
-- `Documents/AccuSec_Canon_3_Part_I_Architecture_Vision.docx`
-- `Documents/Accusec-detailed architecture- part1.docx`
-- `Documents/Canon 3 — Logical-AccuSec Architecture.docx`
+| Provider | Path |
+|---|---|
+| AWS | [`aws/`](./aws/) |
+
+Add sibling folders `azure/`, `gcp/`, `vmware/`, `nutanix/` with the same
+`src/` + `tests/` layout.
 
 ## Planned contents
 
-- `src/` — Service or module source code
-- `tests/` — Unit and integration tests
-- `README.md` — Component documentation (this file)
+- `src/` — shared MCP server host helpers (optional)
+- `tests/` — registry contract tests
+- `<provider>/` — vendor tool schemas and handlers

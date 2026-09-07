@@ -2,20 +2,25 @@
 
 **Layer:** Agent Framework
 
-Agent for hybrid cloud platform operations across AWS, Azure, GCP, and on-prem.
+Domain agent for hybrid cloud operations. Provider-specific code is a **pack**
+under this folder (AWS first), not a separate Enterprise AI Engineer.
+
+See [PROVIDERS.md](./PROVIDERS.md) for the pack contract used by AWS, Azure,
+GCP, VMware, Nutanix, and future platforms.
 
 ## Status
 
-Scaffold only — implementation pending.
+Scaffold — AWS pack folder exists; implementation pending.
 
-## Architecture references
+## Provider packs
 
-- `Documents/AccuSec_Canon_3_Part_I_Architecture_Vision.docx`
-- `Documents/Accusec-detailed architecture- part1.docx`
-- `Documents/Canon 3 — Logical-AccuSec Architecture.docx`
+| Provider | Path |
+|---|---|
+| AWS | [`aws/`](./aws/) |
+| Azure, GCP, VMware, Nutanix, … | Add sibling folders with the same layout |
 
 ## Planned contents
 
-- `src/` — Service or module source code
-- `tests/` — Unit and integration tests
-- `README.md` — Component documentation (this file)
+- `src/` — Hybrid Cloud Engineer runtime definition shared across providers
+- `tests/` — engineer selection and entitlement tests
+- `<provider>/` — allowed skills, tools, and default scopes

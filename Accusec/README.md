@@ -23,6 +23,10 @@ Accusec/
 ├── interfaces/                 # User interfaces (desktop, web, chat, API, SDK)
 ├── orchestration/              # AI orchestration (planner, workflow, scheduler)
 ├── agents/                     # Agent framework, skills, harness, MCP client
+│   └── enterprise-ai-engineers/hybrid-cloud/<provider>/
+├── integration/
+│   ├── connectors/hybrid-cloud/<provider>/
+│   └── mcp-servers/<provider>/   # AWS first; Azure, GCP, VMware, Nutanix later
 ├── platform-services/          # Context, auth, policy, audit, notifications, etc.
 ├── memory/                     # Organizational memory stores
 ├── data/                       # Data layer adapters (PostgreSQL, vector, graph, etc.)
@@ -45,13 +49,42 @@ Principal + Operation + Entity + Scope + Conditions
 
 See [`AGENTS.md`](./AGENTS.md) for branch/PR conventions, component ownership, and Cursor collaboration guidance.
 
-## Getting started
+## Getting started (local AWS slice)
+
+The first runnable slice is memory-first Hybrid Cloud / AWS. Entity memory is **MySQL** (database `accusec`). Pytest uses fixtures; a live account is optional.
+
+```bash
+cd Accusec
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+mysql -uroot < data/operational-db/schema.sql
+pytest
+accusec "list out all t2.small in US-east-1"
+accusec --inspect-db
+```
+
+To pull **real** AWS inventory, create IAM role `AccuSecInventoryReader` and register it as a secret-ref (never in chat). See [`integration/connectors/hybrid-cloud/aws/iam/README.md`](./integration/connectors/hybrid-cloud/aws/iam/README.md).
+
+```bash
+pip install -e ".[aws]"
+accusec secrets put aws/operator \
+  --auth-mode assume-role \
+  --role-arn arn:aws:iam::ACCOUNT:role/AccuSecInventoryReader \
+  --external-id accusec-local \
+  --profile default
+accusec provider connect aws --account ACCOUNT --regions us-east-1 --secret-ref aws/operator
+accusec provider sync --region us-east-1
+accusec provider status
+```
+
+- List uses Entity Memory (SQLite) after query-time authorization; LLM is not used.
+- Stop without `instance_id` returns Planner clarification (not HITL).
+- Stop with a chosen instance refreshes AWS (fixture connector), then HITL approval, then postcondition check.
 
 1. Read the architecture documents in `Documents/`.
 2. Read [`AGENTS.md`](./AGENTS.md) and fill in ownership for your team.
-3. Browse component README stubs for the area you are implementing.
-4. Implement services under the matching folder following the planned `src/` and `tests/` layout in each README.
 
 ## Status
 
-Repository scaffold — folder structure and README stubs only. Implementation pending.
+Local Hybrid Cloud / AWS slice implemented under component `src/` folders. Other layers remain stubs.

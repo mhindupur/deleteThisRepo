@@ -1,0 +1,50 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "IdentityCheck",
+      "Effect": "Allow",
+      "Action": ["sts:GetCallerIdentity"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EnumerateAllIndexedResources",
+      "Effect": "Allow",
+      "Action": [
+        "resource-explorer-2:Search",
+        "resource-explorer-2:ListIndexes",
+        "resource-explorer-2:GetIndex",
+        "resource-explorer-2:ListViews",
+        "resource-explorer-2:GetView",
+        "resource-explorer-2:ListSupportedResourceTypes",
+        "cloudcontrol:ListResources",
+        "cloudcontrol:GetResource",
+        "tag:GetResources"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "HydrateCatalogTypes",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:Describe*",
+        "s3:ListAllMyBuckets",
+        "s3:GetBucketLocation",
+        "s3:GetBucketTagging",
+        "rds:DescribeDBInstances",
+        "eks:ListClusters",
+        "eks:DescribeCluster",
+        "iam:ListRoles",
+        "iam:GetRole",
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeTargetGroups",
+        "autoscaling:DescribeAutoScalingGroups",
+        "lambda:ListFunctions",
+        "lambda:GetFunction",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:GetMetricStatistics"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
