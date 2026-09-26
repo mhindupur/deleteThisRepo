@@ -16,4 +16,9 @@ SKILLS = {
         "tools": ["aws.ec2.describe_instances", "aws.ec2.stop_instances"],
         "uses_llm": False,
     },
+    "aws.compute.instance.start": {
+        "operation_id": "compute.instance.start",
+        "tools": ["aws.ec2.describe_instances", "aws.ec2.start_instances"],
+        "uses_llm": False,
+    },
 }

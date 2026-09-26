@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AccuSec Console</title>
+    <link rel="stylesheet" href="/static/styles.css?v=console5" />
+  </head>
+  <body>
+    <nav class="rail" aria-label="Product areas">
+      <div class="brand">
+        <img src="/static/logo.png" alt="AccuSec.ai" />
+        <div>
+          <strong>AccuSec.ai</strong>
+          <span>Desktop profile</span>
+        </div>
+      </div>
+      <p class="rail-label">Live</p>
+      <button class="nav-btn active" data-view="ask">Ask</button>
+      <button class="nav-btn" data-view="workflow">Change workflow</button>
+      <button class="nav-btn" data-view="inventory">Inventory</button>
+      <button class="nav-btn" data-view="endpoints">Endpoints</button>
+      <p class="rail-label">Reference — not implemented</p>
+      <button class="nav-btn ref" data-view="organization">Organization</button>
+      <button class="nav-btn ref" data-view="folders">Folders</button>
+      <button class="nav-btn ref" data-view="iam">IAM policies</button>
+      <button class="nav-btn ref" data-view="agents">AI Engineers</button>
+      <button class="nav-btn ref" data-view="mcp">MCP registry</button>
+      <button class="nav-btn ref" data-view="entitlements">Entitlements</button>
+      <button class="nav-btn ref" data-view="memory">Memory ACLs</button>
+      <button class="nav-btn ref" data-view="audit">Audit reconstruct</button>
+      <button class="nav-btn ref" data-view="dayn">Day 0 / 1 / N</button>
+    </nav>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div>
+          <h1 id="view-title">Ask AccuSec</h1>
+          <p id="header-org">Desktop profile</p>
+        </div>
+        <div class="identity" id="identity">
+          <label class="inline">Principal
+            <select id="principal-select"></select>
+          </label>
+          <label class="inline">Identity
+            <select id="identity-select"></select>
+          </label>
+          <span class="pill" id="connection-pill">loading</span>
+        </div>
+      </header>
+
+      <section id="view-ask" class="view active">
+        <div id="thread" class="thread"></div>
+        <form id="ask-form" class="composer">
+          <textarea
+            id="intent"
+            name="intent"
+            required
+            rows="3"
+            placeholder="Ask AccuSec… e.g. List out ap-south-1 available instances"
+          ></textarea>
+          <div class="composer-bar">
+            <span class="hint">Enter to send · Shift+Enter for a new line · list / stop / volume / expand are live</span>
+            <button type="submit">Send</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="view-workflow" class="view" hidden>
+        <p class="lede">
+          Change operations follow Observe → Reason → Authorize → Approve → Execute → Validate → Record.
+          Chat is a client. The task in MySQL is the system of record.
+        </p>
+        <ol class="pipeline" id="pipeline">
+          <li data-phase="observe">Observe<span>Memory first, then live AWS if approved</span></li>
+          <li data-phase="reason">Reason<span>Deterministic planner maps intent to a catalog operation</span></li>
+          <li data-phase="authorize">Authorize<span>CONTEXT_ACCESS then EXECUTION. Default deny.</span></li>
+          <li data-phase="approve">Approve<span>HITL bound to plan_id + version after REQUIRE_APPROVAL</span></li>
+          <li data-phase="execute">Execute<span>MCP allowlist + Endpoint Access Identity + AWS IAM</span></li>
+          <li data-phase="validate">Validate<span>Describe after change. Do not trust API ack.</span></li>
+          <li data-phase="record">Record<span>Upsert Organizational Memory and write audit</span></li>
+        </ol>
+        <div class="card-grid">
+          <article class="card">
+            <h2>Live operations</h2>
+            <ul class="plain">
+              <li><code>compute.instance.list</code> — memory, no HITL</li>
+              <li><code>compute.instance.stop</code> — policy → memory → AWS refresh → HITL → stop → Describe</li>
+              <li><code>compute.instance.start</code> — policy → memory → AWS refresh → HITL → start → Describe</li>
+              <li><code>storage.volume.read</code> — memory, or HITL hydrate from AWS</li>
+              <li><code>storage.volume.expand</code> — HITL ModifyVolume, no shrink</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h2>Last task</h2>
+            <pre class="status-box light" id="last-task">No task in this browser session yet. Use Ask.</pre>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-inventory" class="view" hidden>
+        <div class="toolbar">
+          <label>Region <input id="inv-region" placeholder="ap-south-1" /></label>
+          <label>Type <input id="inv-type" placeholder="t3.medium" /></label>
+          <label>State <input id="inv-state" placeholder="stopped" /></label>
+          <button type="button" id="inv-refresh">Load from memory</button>
+        </div>
+        <p class="hint-inline">Reads <code>/api/entities</code> after AccuSec context authorization. AWS is not queried here.</p>
+        <div id="inventory-table"></div>
+      </section>
+
+      <section id="view-endpoints" class="view" hidden>
+        <div class="card-grid">
+          <article class="card">
+            <h2>Connect AWS role <span class="badge live">Live</span></h2>
+            <p class="hint-inline">IAM role is a secret-ref. Account is parsed from the ARN. This is Plane 4 plus connection metadata — not Plane 3 provisioning.</p>
+            <form id="connect-form">
+              <label>IAM role ARN
+                <input name="role_arn" required placeholder="arn:aws:iam::442042550517:role/ACCUSEC_EC2_ROLE" />
+              </label>
+              <p class="derived" id="derived-account">Account will be read from the ARN.</p>
+              <label>Regions
+                <input name="regions" required placeholder="us-east-1, ap-south-1" />
+              </label>
+              <label>AWS CLI profile
+                <input name="profile" value="default" />
+              </label>
+              <p class="hint-inline">Local profile used to AssumeRole. Not the IAM role itself.</p>
+              <label>External ID (optional)
+                <input name="external_id" value="accusec-local" />
+              </label>
+              <button type="submit">Connect role</button>
+            </form>
+            <div class="row">
+              <label class="grow">Sync region
+                <input id="sync-region" placeholder="ap-south-1" />
+              </label>
+              <button type="button" id="sync-btn" class="secondary">Sync inventory</button>
+            </div>
+          </article>
+          <article class="card">
+            <h2>Connection</h2>
+            <pre class="status-box light" id="connection-status">No connection loaded.</pre>
+            <h3>Endpoint Access Identities</h3>
+            <div id="identity-table"></div>
+          </article>
+        </div>
+        <article class="card reference">
+          <h2>Future: more identities on this Endpoint <span class="badge ref">Reference</span></h2>
+          <p class="hint-inline">PRD §18–20 §82. Desktop must not silently pick the most privileged credential. Resolver exists; UI to create extra identities does not.</p>
+          <fieldset disabled>
+            <label>Identity type
+              <select>
+                <option>READ_ONLY</option>
+                <option>OPERATOR</option>
+                <option>AGENT_WORKLOAD</option>
+                <option>INFRASTRUCTURE_ADMIN</option>
+                <option>ENTITLEMENT_PROVISIONER</option>
+              </select>
+            </label>
+            <label>Display name <input placeholder="AWS read-only role" /></label>
+            <label>Role ARN <input placeholder="arn:aws:iam::…:role/ACCUSEC_READONLY" /></label>
+            <button type="button">Register identity</button>
+          </fieldset>
+        </article>
+      </section>
+
+      <section id="view-organization" class="view" hidden>
+        <div class="banner-ref">Reference UI — PRD §4–9 §81. Runtime bootstraps one Tenant, Project 0, and dc-aws. Create/update APIs are not built.</div>
+        <div class="card-grid">
+          <article class="card">
+            <h2>Present objects <span class="badge live">Live IDs</span></h2>
+            <dl class="kv" id="org-kv"></dl>
+          </article>
+          <article class="card reference">
+            <h2>Create Project <span class="badge ref">Reference</span></h2>
+            <fieldset disabled>
+              <label>Display name <input placeholder="Payments" /></label>
+              <label>Kind
+                <select><option>project</option><option>project0</option></select>
+              </label>
+              <button type="button">Create Project</button>
+            </fieldset>
+          </article>
+          <article class="card reference">
+            <h2>Create Datacenter <span class="badge ref">Reference</span></h2>
+            <fieldset disabled>
+              <label>Display name <input placeholder="AWS Production" /></label>
+              <label>Provider type
+                <select>
+                  <option>AWS</option>
+                  <option>AZURE</option>
+                  <option>GCP</option>
+                  <option>NUTANIX</option>
+                  <option>KUBERNETES</option>
+                </select>
+              </label>
+              <label>Project <input value="project-0" /></label>
+              <label>Endpoint <input placeholder="ep-aws" /></label>
+              <button type="button">Create Datacenter</button>
+            </fieldset>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-folders" class="view" hidden>
+        <div class="banner-ref">Reference UI — PRD §11–12 AD-3. Every Datacenter must have one Default Folder. Entities today sit on tenant/workspace only.</div>
+        <article class="card reference">
+          <h2>Folder tree (target)</h2>
+          <pre class="tree">project-0
+└── dc-aws
+    └── Default          ← missing object
+        ├── Payments     ← create Folder
+        │    ├── Web
+        │    └── Database
+        └── Analytics
+            └── entities (EC2, EBS) inherit folder ACL</pre>
+          <fieldset disabled>
+            <label>Parent folder <input value="Default" /></label>
+            <label>Name <input placeholder="Payments" /></label>
+            <button type="button">Create Folder</button>
+          </fieldset>
+        </article>
+      </section>
+
+      <section id="view-iam" class="view" hidden>
+        <div class="banner-ref">Reference UI — PRD §34–47. Today PolicyRule tuples are hardcoded. Roles on Alice/Admin/Viewer/Agent are not Access Control Policies.</div>
+        <div class="card-grid">
+          <article class="card">
+            <h2>Present principals <span class="badge live">Live</span></h2>
+            <div id="principal-table"></div>
+            <p class="hint-inline">Alice holds desktop-administrator and cloud-operator as two assignments. Admin-only cannot stop. That is §83, not a policy editor.</p>
+          </article>
+          <article class="card reference">
+            <h2>Access Control Policy <span class="badge ref">Reference</span></h2>
+            <fieldset disabled>
+              <label>Role
+                <select>
+                  <option>cloud-operator</option>
+                  <option>cloud-viewer</option>
+                  <option>desktop-administrator</option>
+                  <option>ai-engineer</option>
+                </select>
+              </label>
+              <label>Subjects <input placeholder="alice, agent-aws-pack" /></label>
+              <label>Scope
+                <select>
+                  <option>Project: project-0</option>
+                  <option>Datacenter: dc-aws</option>
+                  <option>Folder: Default/Payments</option>
+                  <option>Entity set: env=prod AND vpc=vpc-east</option>
+                </select>
+              </label>
+              <label>Operations <input value="compute.instance.stop, storage.volume.expand" /></label>
+              <label>Effect
+                <select>
+                  <option>ALLOW_WITH_APPROVAL</option>
+                  <option>ALLOW</option>
+                  <option>DENY</option>
+                </select>
+              </label>
+              <button type="button">Save policy</button>
+            </fieldset>
+          </article>
+          <article class="card reference">
+            <h2>Groups and admission <span class="badge ref">Reference</span></h2>
+            <fieldset disabled>
+              <label>Group name <input placeholder="platform-ops" /></label>
+              <label>IdP group <input placeholder="aad://ops" /></label>
+              <label>Project admission <input placeholder="project-0" /></label>
+              <button type="button">Admit members</button>
+            </fieldset>
+            <p class="hint-inline">Authentication must not create Project membership (PRD §3.2 §32).</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-agents" class="view" hidden>
+        <div class="banner-ref">Reference UI — PRD §26–30 §84. agent-aws-pack is stamped on requests. Creating a Project-bound AI Engineer with Effective Permission = NONE is not built.</div>
+        <div class="card-grid">
+          <article class="card">
+            <h2>Present agent <span class="badge live">Live stamp</span></h2>
+            <dl class="kv">
+              <dt>agent_id</dt><dd>agent-aws-pack</dd>
+              <dt>principal_type</dt><dd>AI_ENGINEER</dd>
+              <dt>role</dt><dd>ai-engineer</dd>
+              <dt>project_id</dt><dd>project-0 (hardcoded)</dd>
+            </dl>
+          </article>
+          <article class="card reference">
+            <h2>Create AI Engineer <span class="badge ref">Reference</span></h2>
+            <fieldset disabled>
+              <label>Name <input placeholder="Cloud Engineer" /></label>
+              <label>Project <input value="project-0" /></label>
+              <label>Owner <input value="alice" /></label>
+              <label>Datacenter rights
+                <select>
+                  <option>dc-aws: none until assigned</option>
+                  <option>dc-aws: viewer</option>
+                  <option>dc-aws: operator + HITL</option>
+                </select>
+              </label>
+              <button type="button">Create agent</button>
+            </fieldset>
+            <p class="hint-inline">Agents cannot administer IAM, escalate Endpoint identity, or inherit the owner’s permissions automatically.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-mcp" class="view" hidden>
+        <div class="banner-ref">Reference UI — PRD §37–40 §71. One in-process AWS MCP server. Discovery must never grant access.</div>
+        <div class="card-grid">
+          <article class="card">
+            <h2>Allowlisted tools <span class="badge live">Live</span></h2>
+            <ul class="plain">
+              <li><code>aws.ec2.describe_instances</code></li>
+              <li><code>aws.ec2.describe_volumes</code></li>
+              <li><code>aws.ec2.stop_instances</code> — write, OPERATOR identity required</li>
+              <li><code>aws.ec2.start_instances</code> — write, OPERATOR identity required</li>
+              <li><code>aws.ec2.modify_volume</code> — write, OPERATOR identity required</li>
+            </ul>
+          </article>
+          <article class="card reference">
+            <h2>Register MCP server <span class="badge ref">Reference</span></h2>
+            <fieldset disabled>
+              <label>Name <input placeholder="aws-prod-mcp" /></label>
+              <label>Datacenter <input value="dc-aws" /></label>
+              <label>Endpoint <input value="ep-aws" /></label>
+              <label>Transport <input placeholder="stdio / streamable-http" /></label>
+              <button type="button">Register and discover tools</button>
+            </fieldset>
+            <p class="hint-inline">Discovered tools become executable permissions only after an Access Control Policy grants them.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-entitlements" class="view" hidden>
+        <div class="banner-ref">Reference UI — Plane 3, PRD §48–54. AccuSec does not create AWS IAM roles. The operator pastes an existing role ARN.</div>
+        <article class="card reference">
+          <h2>Entitlement provisioning (target)</h2>
+          <ol class="steps">
+            <li>AccuSec Role assignment requested</li>
+            <li>IAM validates grantor delegation, Project, Datacenter</li>
+            <li>Translator selects Provider Entitlement Profile</li>
+            <li>Provider identity resolved or created</li>
+            <li>Provider entitlement provisioned and verified</li>
+            <li>Assignment ACTIVE — or DRIFTED on reconcile</li>
+          </ol>
+          <fieldset disabled>
+            <label>AccuSec role <input value="cloud-operator" /></label>
+            <label>Provider profile <input value="AWS EC2 operator (StopInstances, ModifyVolume)" /></label>
+            <label>State
+              <select>
+                <option>PENDING</option>
+                <option>PROVISIONING</option>
+                <option>ACTIVE</option>
+                <option>DRIFTED</option>
+                <option>REVOKED</option>
+              </select>
+            </label>
+            <button type="button">Provision to AWS IAM</button>
+            <button type="button" class="secondary">Reconcile drift</button>
+          </fieldset>
+        </article>
+      </section>
+
+      <section id="view-memory" class="view" hidden>
+        <div class="banner-ref">Reference UI — PRD §61–64. Entity rows exist. Folder index, ACL, classification, document ingest, and sharing are not built.</div>
+        <div class="card-grid">
+          <article class="card">
+            <h2>Present memory <span class="badge live">Live</span></h2>
+            <p class="hint-inline">MySQL <code>entities</code> are observations, not AWS source of truth. tenant_id + workspace_id filter at query time before any model context.</p>
+            <dl class="kv">
+              <dt>Indexed today</dt><dd>tenant, workspace, type, region, account, source, timestamps</dd>
+              <dt>Defaulted</dt><dd>project-0, dc-aws on new Entity models</dd>
+              <dt>Missing</dt><dd>folder_id, ACL, classification, provenance package, document OM</dd>
+            </dl>
+          </article>
+          <article class="card reference">
+            <h2>Ingest document <span class="badge ref">Reference</span></h2>
+            <fieldset disabled>
+              <label>Source system <input placeholder="Confluence / SharePoint" /></label>
+              <label>Classification
+                <select><option>internal</option><option>confidential</option></select>
+              </label>
+              <label>Preserve source ACL <input type="checkbox" checked /></label>
+              <button type="button">Ingest</button>
+            </fieldset>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-audit" class="view" hidden>
+        <div class="banner-ref">Reference UI — PRD §74 §101 Audit. task.admitted / task.completed persist. Full reconstruct of Policy + Role + Folder + MCP tool + provider result is not a console yet.</div>
+        <article class="card">
+          <h2>Required reconstruct chain</h2>
+          <ol class="steps">
+            <li>Initiating Human</li>
+            <li>Executing Agent</li>
+            <li>AccuSec Role + Permission + Policy</li>
+            <li>Project + Datacenter + Folder</li>
+            <li>Endpoint + Endpoint Access Identity</li>
+            <li>MCP tool + target Entity</li>
+            <li>Provider result</li>
+          </ol>
+          <p class="hint-inline">Present events stamp principal, agent_id, project_id, datacenter_id, endpoint_identity_id, correlation_id. Open Ask and complete a stop to produce them.</p>
+        </article>
+      </section>
+
+      <section id="view-dayn" class="view" hidden>
+        <div class="banner-ref">Reference UI — PRD §75. Use this as the implementation checklist, not as a working wizard.</div>
+        <div class="card-grid three">
+          <article class="card">
+            <h2>Day 0 bootstrap</h2>
+            <ul class="check">
+              <li class="on">Create Tenant</li>
+              <li class="on">Create/verify Project 0</li>
+              <li>Configure SSO</li>
+              <li class="on">Register Endpoint (IAM role ARN)</li>
+              <li>Configure entitlement provisioner identity</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h2>Day 1 administration</h2>
+            <ul class="check">
+              <li>Create Projects</li>
+              <li>Create Datacenters + Default Folder</li>
+              <li>Admit users / groups</li>
+              <li>Create Roles and Access Control Policies</li>
+              <li>Create agents and assign rights</li>
+              <li>Provision provider entitlements</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h2>Day N operations</h2>
+            <ul class="check">
+              <li class="on">Inspect resources from memory</li>
+              <li class="on">Authorized context (no LLM on this slice)</li>
+              <li class="on">MCP operations with HITL</li>
+              <li class="on">Approvals bound to plan version</li>
+              <li>Entitlement reconcile / drift</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </div>
+    <script src="/static/app.js?v=console5"></script>
+  </body>
+</html>

@@ -6,7 +6,14 @@ import json
 from typing import Any
 
 from accusec.memory.entity.store import mysql_config
-from accusec.shared.domain.models import ProviderConnection, SyncRun, utcnow
+from accusec.shared.domain.models import (
+    AuditEvent,
+    EndpointAccessIdentity,
+    ProviderConnection,
+    SyncRun,
+    Task,
+    utcnow,
+)
 
 DDL = [
     """
@@ -23,6 +30,9 @@ DDL = [
       last_error VARCHAR(1024) NULL,
       created_by VARCHAR(128) NOT NULL,
       caller_arn VARCHAR(512) NULL,
+      endpoint_id VARCHAR(64) NULL,
+      project_id VARCHAR(64) NOT NULL DEFAULT 'project-0',
+      datacenter_id VARCHAR(64) NOT NULL DEFAULT 'dc-aws',
       UNIQUE KEY uq_provider_account_workspace (provider, account_id, workspace_id)
     )
     """,
@@ -57,6 +67,77 @@ DDL = [
       PRIMARY KEY (connection_id, entity_type, region)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS tenants (
+      tenant_id VARCHAR(64) NOT NULL PRIMARY KEY,
+      display_name VARCHAR(255) NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS projects (
+      project_id VARCHAR(64) NOT NULL PRIMARY KEY,
+      tenant_id VARCHAR(64) NOT NULL,
+      display_name VARCHAR(255) NOT NULL,
+      kind VARCHAR(32) NOT NULL DEFAULT 'project'
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS datacenters (
+      datacenter_id VARCHAR(64) NOT NULL PRIMARY KEY,
+      tenant_id VARCHAR(64) NOT NULL,
+      project_id VARCHAR(64) NOT NULL,
+      workspace_id VARCHAR(64) NOT NULL,
+      display_name VARCHAR(255) NOT NULL,
+      endpoint_id VARCHAR(64) NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS endpoint_access_identities (
+      endpoint_identity_id VARCHAR(64) NOT NULL PRIMARY KEY,
+      tenant_id VARCHAR(64) NOT NULL,
+      endpoint_id VARCHAR(64) NOT NULL,
+      provider_type VARCHAR(32) NOT NULL,
+      identity_type VARCHAR(32) NOT NULL,
+      secret_ref VARCHAR(255) NOT NULL,
+      status VARCHAR(32) NOT NULL,
+      display_name VARCHAR(255) NOT NULL,
+      last_verified_at VARCHAR(64) NULL,
+      INDEX idx_eai_endpoint (endpoint_id, status)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS tasks (
+      task_id VARCHAR(64) NOT NULL PRIMARY KEY,
+      state VARCHAR(32) NOT NULL,
+      task_json JSON NOT NULL,
+      updated_at VARCHAR(64) NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS approvals (
+      approval_id VARCHAR(64) NOT NULL PRIMARY KEY,
+      plan_id VARCHAR(64) NOT NULL,
+      plan_version INT NOT NULL,
+      status VARCHAR(32) NOT NULL,
+      requester VARCHAR(128) NOT NULL,
+      approver VARCHAR(128) NULL,
+      task_id VARCHAR(64) NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS audit_events (
+      event_id VARCHAR(64) NOT NULL PRIMARY KEY,
+      event_type VARCHAR(64) NOT NULL,
+      tenant_id VARCHAR(64) NOT NULL,
+      principal_id VARCHAR(128) NOT NULL,
+      operation_id VARCHAR(128) NULL,
+      task_id VARCHAR(64) NULL,
+      correlation_id VARCHAR(64) NULL,
+      payload_json JSON NOT NULL,
+      timestamp VARCHAR(64) NOT NULL,
+      INDEX idx_audit_corr (correlation_id)
+    )
+    """,
 ]
 
 
@@ -70,6 +151,43 @@ class ControlPlaneStore:
         with self._conn.cursor() as cur:
             for stmt in DDL:
                 cur.execute(stmt)
+            self._migrate(cur)
+        self._conn.commit()
+        self.ensure_desktop_org()
+
+    def _migrate(self, cur) -> None:
+        cur.execute(
+            """
+            SELECT COLUMN_NAME FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'provider_connections'
+            """
+        )
+        cols = {row["COLUMN_NAME"] for row in cur.fetchall()}
+        if "endpoint_id" not in cols:
+            cur.execute("ALTER TABLE provider_connections ADD COLUMN endpoint_id VARCHAR(64) NULL")
+        if "project_id" not in cols:
+            cur.execute("ALTER TABLE provider_connections ADD COLUMN project_id VARCHAR(64) NOT NULL DEFAULT 'project-0'")
+        if "datacenter_id" not in cols:
+            cur.execute("ALTER TABLE provider_connections ADD COLUMN datacenter_id VARCHAR(64) NOT NULL DEFAULT 'dc-aws'")
+
+    def ensure_desktop_org(self) -> None:
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "INSERT IGNORE INTO tenants (tenant_id, display_name) VALUES (%s, %s)",
+                ("tenant-1", "Desktop Tenant"),
+            )
+            cur.execute(
+                "INSERT IGNORE INTO projects (project_id, tenant_id, display_name, kind) VALUES (%s, %s, %s, %s)",
+                ("project-0", "tenant-1", "Project 0", "project0"),
+            )
+            cur.execute(
+                """
+                INSERT IGNORE INTO datacenters
+                (datacenter_id, tenant_id, project_id, workspace_id, display_name, endpoint_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                ("dc-aws", "tenant-1", "project-0", "aws-prod", "AWS Datacenter", None),
+            )
         self._conn.commit()
 
     def upsert_connection(self, conn: ProviderConnection) -> None:
@@ -77,8 +195,8 @@ class ControlPlaneStore:
             INSERT INTO provider_connections (
                 connection_id, provider, tenant_id, workspace_id, account_id,
                 regions_json, secret_ref, status, last_sync_at, last_error,
-                created_by, caller_arn
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                created_by, caller_arn, endpoint_id, project_id, datacenter_id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             AS new
             ON DUPLICATE KEY UPDATE
                 regions_json = new.regions_json,
@@ -86,8 +204,13 @@ class ControlPlaneStore:
                 status = new.status,
                 last_sync_at = new.last_sync_at,
                 last_error = new.last_error,
-                caller_arn = new.caller_arn
+                caller_arn = new.caller_arn,
+                endpoint_id = new.endpoint_id,
+                project_id = new.project_id,
+                datacenter_id = new.datacenter_id
         """
+        if not conn.endpoint_id:
+            conn.endpoint_id = "ep-aws"
         with self._conn.cursor() as cur:
             cur.execute(
                 sql,
@@ -104,6 +227,9 @@ class ControlPlaneStore:
                     conn.last_error,
                     conn.created_by,
                     conn.caller_arn,
+                    conn.endpoint_id,
+                    conn.project_id,
+                    conn.datacenter_id,
                 ),
             )
         self._conn.commit()
@@ -254,6 +380,224 @@ class ControlPlaneStore:
             )
             return list(cur.fetchall())
 
+    def org_snapshot(self) -> dict[str, Any]:
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT * FROM tenants WHERE tenant_id = %s", ("tenant-1",))
+            tenant = cur.fetchone() or {"tenant_id": "tenant-1", "display_name": "Desktop Tenant"}
+            cur.execute("SELECT * FROM projects WHERE project_id = %s", ("project-0",))
+            project = cur.fetchone() or {"project_id": "project-0", "display_name": "Project 0"}
+            cur.execute("SELECT * FROM datacenters WHERE datacenter_id = %s", ("dc-aws",))
+            datacenter = cur.fetchone() or {
+                "datacenter_id": "dc-aws",
+                "workspace_id": "aws-prod",
+                "display_name": "AWS Datacenter",
+            }
+        return {
+            "tenant_id": tenant["tenant_id"],
+            "tenant_name": tenant["display_name"],
+            "project_id": project["project_id"],
+            "project_name": project["display_name"],
+            "datacenter_id": datacenter["datacenter_id"],
+            "datacenter_name": datacenter["display_name"],
+            "workspace_id": datacenter["workspace_id"],
+        }
+
+    def upsert_identity(self, identity: EndpointAccessIdentity) -> None:
+        sql = """
+            INSERT INTO endpoint_access_identities (
+                endpoint_identity_id, tenant_id, endpoint_id, provider_type,
+                identity_type, secret_ref, status, display_name, last_verified_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            AS new
+            ON DUPLICATE KEY UPDATE
+                secret_ref = new.secret_ref,
+                status = new.status,
+                display_name = new.display_name,
+                last_verified_at = new.last_verified_at
+        """
+        verified = identity.last_verified_at
+        with self._conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    identity.endpoint_identity_id,
+                    identity.tenant_id,
+                    identity.endpoint_id,
+                    identity.provider_type,
+                    identity.identity_type,
+                    identity.secret_ref,
+                    identity.status,
+                    identity.display_name,
+                    verified.isoformat() if hasattr(verified, "isoformat") else verified,
+                ),
+            )
+        self._conn.commit()
+
+    def list_identities(
+        self,
+        *,
+        tenant_id: str | None = None,
+        endpoint_id: str | None = None,
+    ) -> list[EndpointAccessIdentity]:
+        sql = "SELECT * FROM endpoint_access_identities WHERE 1=1"
+        args: list[Any] = []
+        if tenant_id:
+            sql += " AND tenant_id = %s"
+            args.append(tenant_id)
+        if endpoint_id:
+            sql += " AND endpoint_id = %s"
+            args.append(endpoint_id)
+        sql += " ORDER BY identity_type, display_name"
+        with self._conn.cursor() as cur:
+            cur.execute(sql, args)
+            rows = cur.fetchall()
+        return [self._row_to_identity(row) for row in rows]
+
+    def get_identity(self, endpoint_identity_id: str) -> EndpointAccessIdentity | None:
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM endpoint_access_identities WHERE endpoint_identity_id = %s",
+                (endpoint_identity_id,),
+            )
+            row = cur.fetchone()
+        return self._row_to_identity(row) if row else None
+
+    def ensure_endpoint_identity(
+        self,
+        *,
+        tenant_id: str,
+        endpoint_id: str,
+        secret_ref: str,
+        identity_type: str = "OPERATOR",
+        display_name: str = "Desktop AWS operator",
+    ) -> EndpointAccessIdentity:
+        for item in self.list_identities(tenant_id=tenant_id, endpoint_id=endpoint_id):
+            if item.identity_type == identity_type:
+                if item.secret_ref != secret_ref or item.display_name != display_name:
+                    item.secret_ref = secret_ref
+                    item.display_name = display_name
+                    item.status = "active"
+                    self.upsert_identity(item)
+                return item
+        identity = EndpointAccessIdentity(
+            tenant_id=tenant_id,
+            endpoint_id=endpoint_id,
+            identity_type=identity_type,
+            secret_ref=secret_ref,
+            display_name=display_name,
+            last_verified_at=utcnow(),
+        )
+        self.upsert_identity(identity)
+        return identity
+
+    def save_task(self, task: Task) -> None:
+        sql = """
+            INSERT INTO tasks (task_id, state, task_json, updated_at)
+            VALUES (%s, %s, %s, %s) AS new
+            ON DUPLICATE KEY UPDATE
+                state = new.state,
+                task_json = new.task_json,
+                updated_at = new.updated_at
+        """
+        with self._conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (task.task_id, task.state.value, task.model_dump_json(), utcnow().isoformat()),
+            )
+        self._conn.commit()
+
+    def get_task(self, task_id: str) -> Task | None:
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT task_json FROM tasks WHERE task_id = %s", (task_id,))
+            row = cur.fetchone()
+        if not row:
+            return None
+        payload = row["task_json"]
+        if isinstance(payload, (bytes, bytearray)):
+            payload = payload.decode()
+        if isinstance(payload, dict):
+            return Task.model_validate(payload)
+        return Task.model_validate_json(payload)
+
+    def save_approval(self, approval_id: str, record: dict[str, Any]) -> None:
+        sql = """
+            INSERT INTO approvals (
+                approval_id, plan_id, plan_version, status, requester, approver, task_id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s) AS new
+            ON DUPLICATE KEY UPDATE
+                status = new.status,
+                approver = new.approver,
+                task_id = new.task_id
+        """
+        with self._conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    approval_id,
+                    record["plan_id"],
+                    int(record["version"]),
+                    record["status"],
+                    record["requester"],
+                    record.get("approver"),
+                    record.get("task_id"),
+                ),
+            )
+        self._conn.commit()
+
+    def get_approval(self, approval_id: str) -> dict[str, Any] | None:
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT * FROM approvals WHERE approval_id = %s", (approval_id,))
+            row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "plan_id": row["plan_id"],
+            "version": int(row["plan_version"]),
+            "status": row["status"],
+            "requester": row["requester"],
+            "approver": row.get("approver"),
+            "task_id": row.get("task_id"),
+        }
+
+    def save_audit(self, event: AuditEvent) -> None:
+        sql = """
+            INSERT INTO audit_events (
+                event_id, event_type, tenant_id, principal_id, operation_id,
+                task_id, correlation_id, payload_json, timestamp
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            AS new
+            ON DUPLICATE KEY UPDATE payload_json = new.payload_json
+        """
+        with self._conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    event.event_id,
+                    event.event_type,
+                    event.tenant_id,
+                    event.principal_id,
+                    event.operation_id,
+                    event.task_id,
+                    event.correlation_id,
+                    json.dumps(event.payload),
+                    event.timestamp.isoformat() if hasattr(event.timestamp, "isoformat") else event.timestamp,
+                ),
+            )
+        self._conn.commit()
+
+    def _row_to_identity(self, row: dict[str, Any]) -> EndpointAccessIdentity:
+        return EndpointAccessIdentity(
+            endpoint_identity_id=row["endpoint_identity_id"],
+            tenant_id=row["tenant_id"],
+            endpoint_id=row["endpoint_id"],
+            provider_type=row["provider_type"],
+            identity_type=row["identity_type"],
+            secret_ref=row["secret_ref"],
+            status=row["status"],
+            display_name=row["display_name"],
+            last_verified_at=row.get("last_verified_at"),
+        )
+
     def _row_to_connection(self, row: dict[str, Any]) -> ProviderConnection:
         regions = row["regions_json"]
         if isinstance(regions, str):
@@ -272,6 +616,9 @@ class ControlPlaneStore:
             last_error=row.get("last_error"),
             created_by=row["created_by"],
             caller_arn=row.get("caller_arn"),
+            endpoint_id=row.get("endpoint_id"),
+            project_id=row.get("project_id") or "project-0",
+            datacenter_id=row.get("datacenter_id") or "dc-aws",
         )
 
     def _row_to_sync(self, row: dict[str, Any]) -> SyncRun:

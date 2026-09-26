@@ -210,6 +210,11 @@ def main(argv: list[str] | None = None) -> None:
     if argv and argv[0] == "provider":
         _provider_cli(argv[1:], db)
         return
+    if argv and argv[0] == "serve":
+        from accusec.interfaces.api.http import main as serve_main
+
+        serve_main(argv[1:])
+        return
     parser = argparse.ArgumentParser(description="AccuSec local Hybrid Cloud / AWS slice")
     parser.add_argument("intent", nargs="*", help="natural language intent")
     parser.add_argument("--inspect-db", action="store_true", help="Print entity rows and exit")

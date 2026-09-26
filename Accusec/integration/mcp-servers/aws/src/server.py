@@ -9,12 +9,13 @@ READ_TOOLS = {
     "aws.sts.get_caller_identity",
     "aws.ec2.describe_instances",
     "aws.ec2.describe_instance_status",
+    "aws.ec2.describe_volumes",
     "aws.cloudwatch.get_metric_statistics",
     "aws.resourceexplorer.search",
     "aws.cloudcontrol.list_resources",
 }
 
-WRITE_TOOLS = {"aws.ec2.stop_instances"}
+WRITE_TOOLS = {"aws.ec2.stop_instances", "aws.ec2.start_instances", "aws.ec2.modify_volume"}
 
 ALL_TOOLS = READ_TOOLS | WRITE_TOOLS
 
@@ -46,6 +47,18 @@ class AwsMcpServer:
                 instance_ids=arguments.get("instance_ids"),
                 instance_type=arguments.get("instance_type"),
             )
+        if tool == "aws.ec2.describe_volumes":
+            return self.connector.describe_volumes(
+                region=arguments["region"],
+                instance_ids=arguments.get("instance_ids"),
+                volume_ids=arguments.get("volume_ids"),
+            )
+        if tool == "aws.ec2.modify_volume":
+            return self.connector.modify_volume(
+                volume_id=arguments["volume_id"],
+                size_gb=int(arguments["size_gb"]),
+                region=arguments["region"],
+            )
         if tool == "aws.ec2.describe_instance_status":
             instances = self.connector.describe_instances(
                 region=arguments.get("region"),
@@ -74,5 +87,12 @@ class AwsMcpServer:
             return self.connector.stop_instances(
                 arguments["instance_id"],
                 idempotency_key=arguments.get("idempotency_key"),
+                region=arguments.get("region"),
+            )
+        if tool == "aws.ec2.start_instances":
+            return self.connector.start_instances(
+                arguments["instance_id"],
+                idempotency_key=arguments.get("idempotency_key"),
+                region=arguments.get("region"),
             )
         raise ValueError(tool)

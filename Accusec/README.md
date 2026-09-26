@@ -60,6 +60,8 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 mysql -uroot < data/operational-db/schema.sql
 pytest
+accusec serve
+# open http://127.0.0.1:8477 — register IAM role, then ask from the console
 accusec "list out all t2.small in US-east-1"
 accusec --inspect-db
 ```

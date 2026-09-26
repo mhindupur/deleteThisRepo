@@ -2,8 +2,9 @@ from accusec.shared.domain.models import AuditEvent
 
 
 class AuditLog:
-    def __init__(self) -> None:
+    def __init__(self, store=None) -> None:
         self.events: list[AuditEvent] = []
+        self._store = store
 
     def record(self, event: AuditEvent) -> None:
         payload = dict(event.payload)
@@ -21,6 +22,8 @@ class AuditLog:
                 payload[key] = "[redacted]"
         event.payload = payload
         self.events.append(event)
+        if self._store:
+            self._store.save_audit(event)
 
     def for_correlation(self, correlation_id: str) -> list[AuditEvent]:
         return [e for e in self.events if e.correlation_id == correlation_id]

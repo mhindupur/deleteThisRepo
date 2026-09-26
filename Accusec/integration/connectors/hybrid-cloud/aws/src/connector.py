@@ -54,12 +54,53 @@ def _instance(
     )
 
 
+def _volume(
+    volume_id: str,
+    instance_id: str,
+    region: str,
+    size: int,
+    volume_type: str,
+    device: str,
+    state: str = "in-use",
+) -> Entity:
+    return Entity(
+        entity_id=Entity.make_id("aws", "aws.ec2.volume", TENANT, ACCOUNT, region, volume_id),
+        provider_entity_id=volume_id,
+        entity_type="aws.ec2.volume",
+        provider="aws",
+        tenant_id=TENANT,
+        workspace_id=WORKSPACE,
+        display_name=volume_id,
+        account_id=ACCOUNT,
+        region=region,
+        lifecycle_state=state,
+        configuration={
+            "size": size,
+            "volume_type": volume_type,
+            "provider_type": "AWS::EC2::Volume",
+            "attachments": [{"instance_id": instance_id, "device": device}],
+            "attached_instance_ids": [instance_id],
+        },
+        source="aws.fixture",
+        last_observed_at=utcnow(),
+    )
+
+
 def fixture_inventory() -> list[Entity]:
     return [
         _instance("i-aaa111", "web-1", "t2.small", "us-east-1", "vpc-east", "running", 12.0),
         _instance("i-bbb222", "web-2", "t2.small", "us-east-1", "vpc-east", "running", 81.0),
         _instance("i-ccc333", "batch-1", "t2.medium", "us-east-1", "vpc-east", "running", 5.0),
         _instance("i-ddd444", "west-app", "t2.small", "us-west-2", "vpc-west", "running", 9.0),
+    ]
+
+
+def fixture_volumes() -> list[Entity]:
+    return [
+        _volume("vol-aaa111", "i-aaa111", "us-east-1", 8, "gp3", "/dev/xvda"),
+        _volume("vol-bbb222", "i-bbb222", "us-east-1", 20, "gp3", "/dev/xvda"),
+        _volume("vol-ccc333", "i-ccc333", "us-east-1", 50, "gp3", "/dev/xvda"),
+        _volume("vol-ddd444", "i-ddd444", "us-west-2", 8, "gp2", "/dev/xvda"),
     ]
 
 
@@ -88,6 +129,7 @@ class AwsConnector:
             fixture_mode = spec.auth_mode == "fixture" or secret_ref.endswith("local-fixture")
         self.fixture_mode = fixture_mode
         self._live = {e.provider_entity_id: deepcopy(e) for e in fixture_inventory()}
+        self._volumes = {e.provider_entity_id: deepcopy(e) for e in fixture_volumes()}
         self._session = None
 
     def _spec(self) -> SecretSpec:
@@ -253,6 +295,14 @@ class AwsConnector:
                 "arn": inst.get("InstanceArn")
                 or f"arn:aws:ec2:{region}:{account}:instance/{instance_id}",
                 "provider_type": "AWS::EC2::Instance",
+                "block_devices": [
+                    {
+                        "device": mapping.get("DeviceName"),
+                        "volume_id": (mapping.get("Ebs") or {}).get("VolumeId"),
+                    }
+                    for mapping in inst.get("BlockDeviceMappings") or []
+                    if (mapping.get("Ebs") or {}).get("VolumeId")
+                ],
             },
             source="aws.api",
             last_observed_at=utcnow(),
@@ -468,14 +518,51 @@ class AwsConnector:
                 )
         return out
 
-    def describe_volumes(self, region: str) -> list[Entity]:
+    def describe_volumes(
+        self,
+        region: str,
+        instance_ids: list[str] | None = None,
+        volume_ids: list[str] | None = None,
+    ) -> list[Entity]:
         if self.fixture_mode:
-            return []
+            out: list[Entity] = []
+            wanted_instances = {item.lower() for item in instance_ids or []}
+            wanted_volumes = {item.lower() for item in volume_ids or []}
+            for entity in self._volumes.values():
+                if region and (entity.region or "").lower() != region.lower():
+                    continue
+                if wanted_volumes and entity.provider_entity_id.lower() not in wanted_volumes:
+                    continue
+                attached = {
+                    (attachment.get("instance_id") or "").lower()
+                    for attachment in entity.configuration.get("attachments") or []
+                }
+                if wanted_instances and not (attached & wanted_instances):
+                    continue
+                snap = self._stamp(deepcopy(entity))
+                snap.source = "aws.api"
+                snap.last_observed_at = utcnow()
+                out.append(snap)
+            return out
         client = self._client("ec2", region)
+        kwargs: dict[str, Any] = {}
+        if volume_ids:
+            kwargs["VolumeIds"] = volume_ids
+        elif instance_ids:
+            kwargs["Filters"] = [{"Name": "attachment.instance-id", "Values": instance_ids}]
         out: list[Entity] = []
-        for page in client.get_paginator("describe_volumes").paginate():
+        for page in client.get_paginator("describe_volumes").paginate(**kwargs):
             for vol in page.get("Volumes", []):
                 volume_id = vol["VolumeId"]
+                attachments = [
+                    {
+                        "instance_id": attachment.get("InstanceId"),
+                        "device": attachment.get("Device"),
+                        "state": attachment.get("State"),
+                    }
+                    for attachment in vol.get("Attachments") or []
+                ]
+                attached_ids = [row["instance_id"] for row in attachments if row.get("instance_id")]
                 out.append(
                     self._observed(
                         entity_type="aws.ec2.volume",
@@ -486,11 +573,36 @@ class AwsConnector:
                         configuration={
                             "size": vol.get("Size"),
                             "volume_type": vol.get("VolumeType"),
+                            "iops": vol.get("Iops"),
+                            "encrypted": vol.get("Encrypted"),
                             "provider_type": "AWS::EC2::Volume",
+                            "attachments": attachments,
+                            "attached_instance_ids": attached_ids,
                         },
                     )
                 )
         return out
+
+    def modify_volume(self, volume_id: str, size_gb: int, region: str) -> Entity:
+        if size_gb < 1:
+            raise ValueError("size_gb must be at least 1")
+        if self.fixture_mode:
+            entity = self._volumes.get(volume_id)
+            if entity is None:
+                raise KeyError(f"unknown volume {volume_id}")
+            current = int(entity.configuration.get("size") or 0)
+            if size_gb < current:
+                raise ValueError(f"EBS volumes cannot be shrunk ({current} GiB → {size_gb} GiB)")
+            entity.configuration["size"] = size_gb
+            entity.last_observed_at = utcnow()
+            entity.source = "aws.api"
+            return self._stamp(deepcopy(entity))
+        client = self._client("ec2", region)
+        client.modify_volume(VolumeId=volume_id, Size=size_gb)
+        observed = self.describe_volumes(region, volume_ids=[volume_id])
+        if not observed:
+            raise RuntimeError(f"modify issued but volume {volume_id} was not returned by DescribeVolumes")
+        return observed[0]
 
     def describe_load_balancers(self, region: str) -> list[Entity]:
         if self.fixture_mode:
@@ -676,14 +788,50 @@ class AwsConnector:
                 )
         return out
 
-    def stop_instances(self, instance_id: str, idempotency_key: str | None = None) -> Entity:
-        if not self.fixture_mode:
-            raise PermissionError("live stop is not enabled in this slice")
-        entity = self._live[instance_id]
-        if entity.lifecycle_state in {"stopped", "stopping"}:
+    def stop_instances(
+        self,
+        instance_id: str,
+        idempotency_key: str | None = None,
+        region: str | None = None,
+    ) -> Entity:
+        if self.fixture_mode:
+            entity = self._live[instance_id]
+            if entity.lifecycle_state in {"stopped", "stopping"}:
+                return deepcopy(entity)
+            entity.lifecycle_state = "stopping"
+            entity.last_observed_at = utcnow()
+            entity.source = "aws.api"
+            entity.configuration["last_stop_key"] = idempotency_key
             return deepcopy(entity)
-        entity.lifecycle_state = "stopping"
-        entity.last_observed_at = utcnow()
-        entity.source = "aws.api"
-        entity.configuration["last_stop_key"] = idempotency_key
-        return deepcopy(entity)
+        if not region:
+            raise ValueError("region is required for live StopInstances")
+        client = self._client("ec2", region)
+        client.stop_instances(InstanceIds=[instance_id])
+        observed = self.describe_instances(region=region, instance_ids=[instance_id])
+        if not observed:
+            raise RuntimeError(f"stop issued but instance {instance_id} was not returned by DescribeInstances")
+        return observed[0]
+
+    def start_instances(
+        self,
+        instance_id: str,
+        idempotency_key: str | None = None,
+        region: str | None = None,
+    ) -> Entity:
+        if self.fixture_mode:
+            entity = self._live[instance_id]
+            if entity.lifecycle_state in {"running", "pending"}:
+                return deepcopy(entity)
+            entity.lifecycle_state = "pending"
+            entity.last_observed_at = utcnow()
+            entity.source = "aws.api"
+            entity.configuration["last_start_key"] = idempotency_key
+            return deepcopy(entity)
+        if not region:
+            raise ValueError("region is required for live StartInstances")
+        client = self._client("ec2", region)
+        client.start_instances(InstanceIds=[instance_id])
+        observed = self.describe_instances(region=region, instance_ids=[instance_id])
+        if not observed:
+            raise RuntimeError(f"start issued but instance {instance_id} was not returned by DescribeInstances")
+        return observed[0]

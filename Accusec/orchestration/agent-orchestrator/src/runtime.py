@@ -23,6 +23,7 @@ from accusec.shared.domain.models import (
     AuthzKind,
     PolicyEffect,
     Principal,
+    PrincipalType,
     ProviderConnection,
     Scope,
     TopologyEdge,
@@ -82,6 +83,12 @@ class AccuSecRuntime:
         self.connector = connector
         self.orchestrator.harness = harness
         self.orchestrator.context.harness = harness
+        self.orchestrator.planner.tenant_id = conn.tenant_id
+        self.orchestrator.planner.workspace_id = conn.workspace_id
+        self.orchestrator.planner.account_id = conn.account_id
+        self.orchestrator.planner.project_id = conn.project_id
+        self.orchestrator.planner.datacenter_id = conn.datacenter_id
+        self.orchestrator.planner.endpoint_id = conn.endpoint_id
         self.collector = InventoryCollector(
             harness=harness,
             entities=self.entities,
@@ -128,23 +135,35 @@ def build_runtime(database: str | None = None, *, fixture_mode: bool | None = No
     mcp = AwsMcpServer(connector)
     harness = SkillHarness(mcp)
     authz = AuthorizationService()
-    audit = AuditLog()
+    audit = AuditLog(store=control)
     context = ContextService(entities, topology, authz, audit, harness=harness)
     planner = Planner(
         tenant_id=active.tenant_id if active else "tenant-1",
         workspace_id=active.workspace_id if active else "aws-prod",
         account_id=active.account_id if active else "123456789012",
+        project_id=active.project_id if active else "project-0",
+        datacenter_id=active.datacenter_id if active else "dc-aws",
+        endpoint_id=(active.endpoint_id if active else None) or "ep-aws",
     )
     orchestrator = AgentOrchestrator(
         planner=planner,
         context=context,
         authz=authz,
         harness=harness,
-        hitl=HitlService(),
+        hitl=HitlService(store=control),
         workflow=WorkflowEngine(),
         audit=audit,
         gateway=AiGateway(),
         entities=entities,
+        control=control,
+    )
+    endpoint_id = planner.endpoint_id or "ep-aws"
+    control.ensure_endpoint_identity(
+        tenant_id=planner.tenant_id,
+        endpoint_id=endpoint_id,
+        secret_ref=secret_ref,
+        identity_type="OPERATOR",
+        display_name="Desktop AWS operator",
     )
     collector = InventoryCollector(
         harness=harness,
@@ -202,6 +221,9 @@ def connect_aws(
         secret_ref=ref,
         status="pending_verify",
         created_by=principal.principal_id,
+        endpoint_id="ep-aws",
+        project_id="project-0",
+        datacenter_id="dc-aws",
     )
     conn.regions = merge_regions(conn.regions if existing else [], regions)
     conn.secret_ref = ref
@@ -230,7 +252,15 @@ def connect_aws(
         raise
     conn.status = "active"
     conn.caller_arn = ident.get("Arn")
+    conn.endpoint_id = conn.endpoint_id or "ep-aws"
     runtime.control.upsert_connection(conn)
+    runtime.control.ensure_endpoint_identity(
+        tenant_id=tenant_id,
+        endpoint_id=conn.endpoint_id,
+        secret_ref=ref,
+        identity_type="OPERATOR",
+        display_name="Desktop AWS operator",
+    )
     runtime.audit.record(
         AuditEvent(
             event_type="provider.connected",
@@ -245,6 +275,9 @@ def connect_aws(
                 "secret_ref": ref,
                 "auth_mode": spec.public_view()["auth_mode"],
                 "caller_arn": conn.caller_arn,
+                "endpoint_id": conn.endpoint_id,
+                "project_id": conn.project_id,
+                "datacenter_id": conn.datacenter_id,
             },
         )
     )
@@ -291,5 +324,37 @@ def allow_connection_regions(
     return conn
 
 
-ALICE = Principal(principal_id="alice", display_name="Alice", roles=["cloud-operator"])
-VIEWER = Principal(principal_id="bob", display_name="Bob", roles=["cloud-viewer"])
+ALICE = Principal(
+    principal_id="alice",
+    display_name="Alice",
+    roles=["desktop-administrator", "cloud-operator"],
+    tenant_id="tenant-1",
+)
+ADMIN = Principal(
+    principal_id="admin",
+    display_name="Desktop Administrator",
+    roles=["desktop-administrator"],
+    tenant_id="tenant-1",
+)
+VIEWER = Principal(principal_id="bob", display_name="Bob", roles=["cloud-viewer"], tenant_id="tenant-1")
+AGENT = Principal(
+    principal_id="agent-aws-pack",
+    display_name="AWS Pack Engineer",
+    roles=["ai-engineer"],
+    principal_type=PrincipalType.AI_ENGINEER.value,
+    tenant_id="tenant-1",
+)
+PRINCIPALS = {
+    ALICE.principal_id: ALICE,
+    ADMIN.principal_id: ADMIN,
+    VIEWER.principal_id: VIEWER,
+    AGENT.principal_id: AGENT,
+}
+
+
+def resolve_principal(principal_id: str | None) -> Principal:
+    if not principal_id:
+        return ALICE
+    if principal_id not in PRINCIPALS:
+        raise KeyError(principal_id)
+    return PRINCIPALS[principal_id]

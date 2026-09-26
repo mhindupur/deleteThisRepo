@@ -24,6 +24,14 @@ class PolicyEffect(str, Enum):
     ALLOW_WITH_APPROVAL = "allow_with_approval"
 
 
+OBLIGATION_APPROVAL = "REQUIRE_APPROVAL"
+
+
+class PrincipalType(str, Enum):
+    HUMAN = "HUMAN"
+    AI_ENGINEER = "AI_ENGINEER"
+
+
 class AuthzKind(str, Enum):
     CONTEXT_ACCESS = "context_access"
     EXECUTION = "execution"
@@ -54,6 +62,8 @@ class Principal(BaseModel):
     principal_id: str
     display_name: str
     roles: list[str] = Field(default_factory=list)
+    principal_type: str = PrincipalType.HUMAN.value
+    tenant_id: str = "tenant-1"
 
 
 class Scope(BaseModel):
@@ -79,6 +89,10 @@ class Scope(BaseModel):
             return entity.workspace_id == self.scope_id
         if self.scope_type == "tenant":
             return entity.tenant_id == self.scope_id
+        if self.scope_type == "project":
+            return (entity.project_id or "") == self.scope_id
+        if self.scope_type == "datacenter":
+            return (entity.datacenter_id or "") == self.scope_id
         return self.scope_id in {entity.entity_id, entity.provider_entity_id}
 
 
@@ -89,6 +103,8 @@ class Entity(BaseModel):
     provider: str
     tenant_id: str
     workspace_id: str
+    project_id: str = "project-0"
+    datacenter_id: str = "dc-aws"
     display_name: str
     account_id: str | None = None
     region: str | None = None
@@ -132,6 +148,8 @@ class OperationalRequest(BaseModel):
     request_id: str = Field(default_factory=lambda: new_id("req"))
     tenant_id: str
     workspace_id: str
+    project_id: str = "project-0"
+    datacenter_id: str = "dc-aws"
     principal: Principal
     intent: str
     operation_id: str
@@ -141,6 +159,10 @@ class OperationalRequest(BaseModel):
     conditions: dict[str, Any] = Field(default_factory=dict)
     requested_outcome: str | None = None
     correlation_id: str = Field(default_factory=lambda: new_id("corr"))
+    endpoint_id: str | None = None
+    endpoint_identity_id: str | None = None
+    agent_id: str | None = "agent-aws-pack"
+    human_initiator_id: str | None = None
 
 
 class PolicyDecision(BaseModel):
@@ -151,6 +173,7 @@ class PolicyDecision(BaseModel):
     operation_id: str
     entity_type: str | None = None
     scope_ids: list[str] = Field(default_factory=list)
+    obligations: list[str] = Field(default_factory=list)
     reason: str
     decided_at: datetime = Field(default_factory=utcnow)
 
@@ -204,6 +227,10 @@ class AuditEvent(BaseModel):
     context_id: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
     timestamp: datetime = Field(default_factory=utcnow)
+    project_id: str | None = None
+    datacenter_id: str | None = None
+    agent_id: str | None = None
+    endpoint_identity_id: str | None = None
 
 
 class SecretSpec(BaseModel):
@@ -239,6 +266,21 @@ class ProviderConnection(BaseModel):
     last_error: str | None = None
     created_by: str
     caller_arn: str | None = None
+    endpoint_id: str | None = None
+    project_id: str = "project-0"
+    datacenter_id: str = "dc-aws"
+
+
+class EndpointAccessIdentity(BaseModel):
+    endpoint_identity_id: str = Field(default_factory=lambda: new_id("eai"))
+    tenant_id: str
+    endpoint_id: str
+    provider_type: str = "aws"
+    identity_type: str
+    secret_ref: str
+    status: str = "active"
+    display_name: str = ""
+    last_verified_at: datetime | None = None
 
 
 class SyncRun(BaseModel):

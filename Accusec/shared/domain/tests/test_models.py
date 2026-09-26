@@ -20,3 +20,5 @@ def test_region_scope_matches():
     )
     assert Scope(scope_type="region", scope_id="us-east-1").matches_entity(entity)
     assert not Scope(scope_type="region", scope_id="us-west-2").matches_entity(entity)
+    assert Scope(scope_type="project", scope_id="project-0").matches_entity(entity)
+    assert Scope(scope_type="datacenter", scope_id="dc-aws").matches_entity(entity)

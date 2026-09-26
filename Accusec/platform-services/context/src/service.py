@@ -17,7 +17,7 @@ from accusec.shared.domain.models import (
     utcnow,
 )
 
-TOKEN_CAP = 10
+TOKEN_CAP = 50
 LIST_MAX_AGE = timedelta(minutes=5)
 
 
@@ -60,10 +60,11 @@ class ContextService:
         stale = self._stale(rows)
         refreshed_from_aws = False
         refresh_error = None
-        wants_refresh = bool(self.harness) and (force_refresh or stale or not rows)
-        # Live DescribeInstances requires a region. List without a region reads memory as-is.
-        if wants_refresh and not region and not force_refresh:
+        # Reads stay in Organizational Memory. Writes pass force_refresh after a memory hit.
+        wants_refresh = bool(self.harness) and force_refresh
+        if wants_refresh and not region:
             wants_refresh = False
+            refresh_error = "region_required"
         if wants_refresh:
             try:
                 aws_rows = self.harness.invoke(
